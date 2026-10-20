@@ -1,0 +1,31 @@
+services:                                   # top-level key: list of containers Compose will run
+  kafka:                                    # service name; other containers in this compose file can reach it as "kafka"
+    image: apache/kafka:4.0.2               # official Kafka image + pinned version (use newest plain 4.x.y tag)
+    container_name: kafka                   # fixed container name, so you can run `docker exec -it kafka ...`
+    ports:
+      - "9092:9092"                         # host:container port mapping, so your Spring Boot app can reach the broker at localhost:9092
+    environment:                            # env vars the image converts into Kafka's server.properties
+      KAFKA_NODE_ID: 1                      # unique ID of this node in the cluster (node.id)
+      KAFKA_PROCESS_ROLES: broker,controller    # this one node acts as both data broker and metadata controller (combined mode)
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093    # sockets the broker opens inside the container: 9092 for clients, 9093 for controller traffic
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092   # address the broker tells clients to use for further connections
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER              # which listener name is used for controller-to-controller communication
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT   # security protocol per listener name (no TLS/auth locally)
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093         # Raft voters in format nodeId@host:port; only node 1 here
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1                # replicas for __consumer_offsets; default is 3, which fails on 1 broker
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1        # replicas for __transaction_state; same reason
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1                   # min in-sync replicas needed to accept transaction writes; must be <= replication factor
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0                # don't wait before first consumer group rebalance (default 3000 ms); faster local dev
+
+
+#  # Optional: web UI at http://localhost:8080
+#  kafka-ui:
+#    image: provectuslabs/kafka-ui:latest
+#    container_name: kafka-ui
+#    ports:
+#      - "8080:8080"
+#    environment:
+#      KAFKA_CLUSTERS_0_NAME: local
+#      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:19092
+#    depends_on:
+#      - kafka
